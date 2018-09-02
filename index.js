@@ -9,9 +9,14 @@ const pg = require('pg');
 const creds = require('./db_creds');
 
 const app = express();
-app.use(bodyParser.json());
+//app.use(bodyParser.json());
+//----
+app.use(bodyParser.json({limit: '10mb', extended: true}))
+//app.use(bodyParser.urlencoded({limit: '10mb', extended: true}))
+//----
 app.post('/submitfile', submitFileHandler);
 app.get('/getfilehashes', getLabelHashesHandler);
+app.get('/getallhashes', getAllHashesHandler);
 const PORT = 8080;
 
 const node = new IPFS();
@@ -47,6 +52,17 @@ function getLabelHashesHandler(req, resp) {
         resp.status(500).send('Something went wrong. Please try again');
     })
 }
+
+//--
+function getAllHashesHandler(req, resp) {
+    getAllHashesFromDB(req.query.label).then((hashes)=>{
+        resp.status(200).send({'hashes':hashes});
+    }).catch((error)=>{
+        console.error(error);
+        resp.status(500).send('Something went wrong. Please try again')
+    })
+}
+//--
 
 function storeOnIPFS(filename, body) {
     return node.files.add({
@@ -87,6 +103,26 @@ function getHashesByLabelFromDB(label) {
         })
     })
 }
+//--
+function getAllHashesFromDB() {
+    return pool.connect().then((client)=>{
+        const query = `
+            SELECT hash
+            FROM label_hashes
+        `;
+        return client.query(query).then((result)=>{
+            client.release();
+            const rows = result.rows;
+            const hashes = [];
+            for (const row of rows) {
+                hashes.push(row['hash']);
+            }
+
+            return Promise.resolve(hashes);
+        })
+    })
+}
+//--
 
 // Code for storing hash on etherium
 // web3.eth.getAccounts().then((accounts) => {
